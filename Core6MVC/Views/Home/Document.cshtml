@@ -1,0 +1,140 @@
+﻿
+@{
+    ViewData["Title"] = "Document";
+}
+
+<div class="container" id="DocumentForm" data-bind="with: MainData">
+    <div class="mb-5" data-bind="template: { name: 'replaceTemplate', data: $data }"></div>
+    <div class="mb-5" data-bind="template: { name: 'toPdfTemplate', data: $data }"></div>
+</div>
+<template id="replaceTemplate">
+    <div class="mb-3">
+        <h4>
+            ◢取代文字
+            (docx,odt)&nbsp;
+            {$你的關鍵字$} 並且套用hightlight字樣
+        </h4>
+        <div data-bind="foreach: ReplaceDictDatas">
+            <div class="mb-2 row">
+                <div class="col-md-auto">
+                    <button class="btn btn-light" data-bind="text: `${$index() + 1}.`"></button>
+                </div>
+                <div class="col-md-2">
+                    <input type="text" class="form-control" placeholder="key" data-bind="value: key" />
+                </div>
+                <div class="col-md-5">
+                    <input type="text" class="form-control" placeholder="value" data-bind="value: value" />
+                </div>
+            </div>
+        </div>
+        <div class="mb-2 row">
+            <div class="col-md-auto">
+                <button class="btn btn-light" data-bind="click: ()=>{ReplaceAddDict()}">+ 新增</button>
+            </div>
+        </div>
+        <div data-bind="foreach: ReplaceFileDatas">
+            <div class="mb-2 row">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <input type="file" class="form-control" aria-label="Upload" data-bind="attr:{id:'File'+$index()},text: fileName,event:{change:()=>{GetFile($element)}}" />
+                        <button class="btn btn-secondary" type="button" data-bind="click: ()=>{PreView()}">預覽檔案</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-secondary" type="button" data-bind="click: ReplaceTag">確定取代</button>
+        <button class="btn btn-secondary" type="button" data-bind="click: DownloadReplaceSample">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-download" viewBox="0 0 18 18">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
+            </svg>
+            範本
+        </button>
+    </div>
+</template>
+<template id="toPdfTemplate">
+    <div class="mb-3">
+        <h4>
+            ◢word轉pdf
+            (docx,odt) 限制3頁
+        </h4>
+        <div data-bind="foreach: ToPdfFileDatas">
+            <div class="mb-2 row">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <input type="file" class="form-control" aria-label="Upload" data-bind="attr:{id:'File'+$index()},text: fileName,event:{change:()=>{GetFile($element)}}" />
+                        <button class="btn btn-secondary" type="button" data-bind="click: ()=>{PreView()}">預覽檔案</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-secondary" type="button" data-bind="click: WordToPdf">確定轉換</button>
+    </div>
+</template>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        var selfId = 'DocumentForm';
+        var _mainVM = null;
+        var MainVM = function () { 
+            var self = this;
+            self.MainData = ko.observable();
+            self.Init = () => { 
+                self.MainData(new DocumentVM());
+            }
+        }
+        var keyValueVM = function (_key, _value) {
+            var self = this;
+            self.key = ko.observable(_key);
+            self.value = ko.observable(_value);
+        }
+        var DocumentVM = function () { 
+            var self = this;
+            //替換關鍵字
+            self.ReplaceFileDatas = ko.observableArray([new $$FileModel()]);
+            self.ReplaceDictDatas = ko.observableArray([new keyValueVM('PONo', 'AAA112333'), new keyValueVM('', '')]);
+            self.ReplaceAddDict = () => {
+                self.ReplaceDictDatas.push(new keyValueVM('', ''));
+            }
+            self.ReplaceTag = async () => {
+                var keyValueDict = new Object();
+                self.ReplaceDictDatas().forEach((item) => {
+                    keyValueDict[item.key()] = item.value();
+                });
+                var rs = await $$AjaxPromise('/Home/WordReplaceTag', ko.toJSON({
+                    byteArrayDatas: self.ReplaceFileDatas().map(x => x.fileByteArr()),
+                    keyValueDict: keyValueDict,
+                }));
+                for (var i = 0; i < self.ReplaceFileDatas().length; i++) {
+                    var itemFile = ko.toJS(self.ReplaceFileDatas()[i]);
+                    itemFile.fileByteArr = rs.byteArrayDatas[i];
+                    new $$FileModel(itemFile).PreView();
+                }
+            }
+            self.DownloadReplaceSample = () => {
+                $.ajax({
+                    type: "POST",
+                    url: "/Home/GetFileSample",
+                    data: JSON.stringify('F1001'),
+                    contentType: "application/json",
+                    success: function (rs) {
+                        $$DownloadFile(rs.sampleFileName, rs.sampleFileType, rs.byteArrayData);
+                    },
+                    error: function () { }
+                });
+            }
+            //轉PDF
+            self.ToPdfFileDatas = ko.observableArray([new $$FileModel()]);
+            self.WordToPdf = async () => {
+                var rs = await $$AjaxPromise('/Home/WordToPdf', ko.toJSON(self.ToPdfFileDatas().map(x => x.fileByteArr())));
+                for (var i = 0; i < self.ToPdfFileDatas().length; i++) {
+                    var itemFile = ko.toJS(self.ToPdfFileDatas()[i]);
+                    itemFile.fileByteArr = rs.byteArrayDatas[i];
+                    itemFile.fileType = 'pdf';
+                    new $$FileModel(itemFile).PreView();
+                }
+            }
+        }
+        ko.applyBindings(_mainVM = new MainVM(), document.getElementById(selfId));
+        _mainVM.Init();
+    });
+</script>
