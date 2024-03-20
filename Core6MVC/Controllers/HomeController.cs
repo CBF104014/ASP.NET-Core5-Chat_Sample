@@ -1,9 +1,10 @@
 ﻿using Core6MVC.Models;
 using Core6MVC.ViewModel;
+using DocTool;
+using DocTool.Dto;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
-using Tool.Doc;
 
 namespace Core6MVC.Controllers
 {
@@ -11,12 +12,12 @@ namespace Core6MVC.Controllers
     {
         private readonly ILogger<HomeController> _logger;
         private readonly IWebHostEnvironment _webHostEnvironment;
-        private WordTool _wordTool { get; set; }
+        private Tool docTool { get; set; }
         public HomeController(ILogger<HomeController> logger, IWebHostEnvironment webHostEnvironment)
         {
             _logger = logger;
             _webHostEnvironment = webHostEnvironment;
-            _wordTool = new WordTool(webHostEnvironment.WebRootPath);
+            this.docTool = new Tool(@"E:\PortableApps\LibreOfficePortable\App\libreoffice\program\soffice.exe", Path.Combine(webHostEnvironment.WebRootPath, "tempData"));
         }
 
         public IActionResult Index()
@@ -63,15 +64,51 @@ namespace Core6MVC.Controllers
         [HttpPost]
         public IActionResult WordReplaceTag([FromBody] fileViewModel fileViewModelData)
         {
+            var replaceData = new Dictionary<string, ReplaceDto>()
+            {
+                ["PONo"] = new ReplaceDto() { textStr = "11300000A1" },
+                ["BarCode1_Image"] = new ReplaceDto()
+                {
+                    replaceType = ReplaceType.Image,
+                    fileName = "barcode",
+                    fileType = "jpg",
+                    fileByteArr = new byte[0],
+                    imageDpi = 72,
+                    imageHeight = 30,
+                    imageWidth = 150,
+                },
+                ["PoVenTable"] = new ReplaceDto()
+                {
+                    replaceType = ReplaceType.Table,
+                    tableData = this.docTool.Word.ToXMLTable(new List<string>() { "品名", "數量", "總價" }, new List<List<string>>() { new List<string>() { "A", "1", "1500" }, new List<string>() { "B", "2", "4500" } }),
+                },
+                ["AppP_Table"] = new ReplaceDto()
+                {
+                    replaceType = ReplaceType.HtmlString,
+                    htmlStr = "<p style=\"background-color:Tomato;\">Lorem ipsum...</p>",
+                },
+                ["AppP2_TableRow"] = new ReplaceDto()
+                {
+                    replaceType = ReplaceType.TableRow,
+                    tableRowDatas = new List<List<string>>() { new List<string>() { "A", "1", "1500" }, new List<string>() { "B", "2", "4500" } }
+             .Select(x =>
+             {
+                 var row = this.docTool.Word.CreateRow();
+                 x.ForEach(item => row.Append(this.docTool.Word.CreateCell(item)));
+                 return row;
+             }).ToList()
+                }
+            };
             for (int i = 0; i < fileViewModelData.byteArrayDatas.Count; i++)
             {
-                fileViewModelData.byteArrayDatas[i] = _wordTool
-                    .LoadFile(fileViewModelData.byteArrayDatas[i])
-                    .FindAndReplace(fileViewModelData.keyValueDict);
+                fileViewModelData.byteArrayDatas[i] = this.docTool.Word
+                    .ReplaceTag("aaa.docx", fileViewModelData.byteArrayDatas[i], replaceData)
+                    .GetData()
+                    .fileByteArr;
             }
             return Json(new
             {
-                fileViewModelData.byteArrayDatas,
+                fileViewModelData.byteArrayDatas
             });
         }
         [HttpPost]
@@ -79,9 +116,10 @@ namespace Core6MVC.Controllers
         {
             for (int i = 0; i < byteArrayDatas.Count; i++)
             {
-                byteArrayDatas[i] = _wordTool
-                    .LoadFile(byteArrayDatas[i])
-                    .ToPDF();
+                byteArrayDatas[i] = this.docTool.Word
+                    .ToPDF("aaa.docx", byteArrayDatas[i])
+                    .GetData()
+                    .fileByteArr;
             }
             return Json(new
             {

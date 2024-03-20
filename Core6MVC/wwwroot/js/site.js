@@ -8,7 +8,7 @@ class $$FileModel {
         this.fileFullName = ko.observable(_fileObj.fileFullName ?? '');
         this.fileByteArr = ko.observable(_fileObj.fileByteArr ?? '');
         //==擴充==
-        this.LimitFileSize = ko.observable(50);
+        this.LimitFileSize = ko.observable(100);
         this.LimitFileTypeArr = ko.observable(_fileObj.LimitFileTypeArr ?? {
             //'pdf': 'application/pdf',
             //'doc': 'application/msword',
@@ -31,13 +31,13 @@ class $$FileModel {
             }
             var File = _para.files[0];
             //兩種驗證型態方式
-            if ((File.type == '' && this.LimitFileTypeArr()[File.name.split('.').pop()] == null) ||
-                (File.type != '' && !Object.values(this.LimitFileTypeArr()).includes(File.type))) {
-                var msg = Object.keys(this.LimitFileTypeArr()).map(x => `.${x}`).join(' ');
-                alert(`上傳格式須為${msg}`);
-                resolve(false);
-                return;
-            }
+            //if ((File.type == '' && this.LimitFileTypeArr()[File.name.split('.').pop()] == null) ||
+            //    (File.type != '' && !Object.values(this.LimitFileTypeArr()).includes(File.type))) {
+            //    var msg = Object.keys(this.LimitFileTypeArr()).map(x => `.${x}`).join(' ');
+            //    alert(`上傳格式須為${msg}`);
+            //    resolve(false);
+            //    return;
+            //}
             if (File.size / 1024 / 1024 > this.LimitFileSize()) {
                 alert(`附件大小需小於${this.LimitFileSize()}MB`);
                 resolve(false);
